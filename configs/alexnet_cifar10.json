@@ -30,13 +30,13 @@
     "run_name": "hello_world_run",
 
     "_desc_network": "Path to NN architecture to use for the run",
-    "network": "files/models/alexnet-cifar10.json",
+    "network": "files/models/alexnet-cifar10-norelu.json",
 
     "_desc_custom_epochs": "Enable custom number of epochs. Otherwise set by size of learning rate schedule",
-    "custom_epochs": false,
+    "custom_epochs": true,
 
     "_desc_custom_epoch_count": "Number of epochs to train for, if custom_epochs is set",
-    "custom_epoch_count": 10,
+    "custom_epoch_count": 3,
 
     "_desc_custom_iterations": "Enable custom number of iterations. Otherwise set by training dataset size.",
     "custom_iterations": false,
@@ -45,7 +45,7 @@
     "custom_iteration_count": 0,
 
     "_desc_custom_batch_size": "Enable custom batch size. Otherwise set by architecture configuration.",
-    "custom_batch_size": true,
+    "custom_batch_size": false,
 
     "_desc_custom_batch_size_count": "Desired custom batch size",
     "custom_batch_size_count": 128,
@@ -120,5 +120,8 @@
     "split": [0, 3],
 
     "_desc_proc_num": "Number of paralleled models",
-    "proc_num": 2
+    "proc_num": 2,
+
+    "avg_loss_log": true,
+    "avg_loss_output": "output/avg_loss_alexnet_cifar10.log"
 }
