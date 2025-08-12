@@ -1,5 +1,9 @@
 #include <iostream>
 #include <string>
+#include <deque>
+#include <fstream>
+#include <mutex>
+#include <cmath>
 
 #include "globals.h"
 #include "mpc/AESObject.h"
@@ -39,6 +43,14 @@ Profiler debug_profiler;
 
 nlohmann::json piranha_config;
 
+// 平均损失日志状态
+bool avg_loss_enabled = false;
+std::fstream avg_loss_out;
+std::mutex avg_loss_mtx;
+std::deque<double> avg_loss_window;
+double avg_loss_sum = 0.0;
+const int AVG_LOSS_WINDOW = 20; // 滑动窗口大小=20
+
 size_t db_bytes = 0;
 size_t db_layer_max_bytes = 0;
 size_t db_max_bytes = 0;
@@ -55,6 +67,11 @@ void train(NeuralNetwork<T, Share> *, NeuralNetConfig *config, std::string, std:
 template<typename T, template<typename, typename...> typename Share>
 void test(NeuralNetwork<T, Share> *, std::ifstream &, std::ifstream &);
 void getBatch(std::ifstream &, std::istream_iterator<double> &, std::vector<double> &);
+double compute_ce_loss_from_logits(const std::vector<double>& logits,
+                                   const std::vector<double>& labels,
+                                   int mini_batch, int num_classes);
+void avg_loss_log_batch(double batch_loss);
+void avg_loss_new_epoch();
 void deleteObjects();
 
 int main(int argc, char** argv) {
@@ -80,6 +97,13 @@ int main(int argc, char** argv) {
 
     std::ifstream input_config(parsed_options["config"].as<std::string>());
     input_config >> piranha_config;
+
+    // 读取 JSON 之后
+    avg_loss_enabled = piranha_config.value("avg_loss_log", false);
+    if (avg_loss_enabled) {
+        std::string avg_path = piranha_config.value("avg_loss_output", std::string("avg_loss.txt"));
+        avg_loss_out.open(avg_path, std::ios::out | std::ios::app);
+    }
 
     // Start memory profiler and initialize communication between parties
     memory_profiler.start();
@@ -192,6 +216,8 @@ int main(int argc, char** argv) {
 
     deleteObjects();
 
+    if (avg_loss_out.is_open()) avg_loss_out.close();
+
     // wait a bit for the prints to flush
     std::cout << std::flush;
     for(int i = 0; i < 10000000; i++);
@@ -200,7 +226,7 @@ int main(int argc, char** argv) {
 }
 
 template<typename T, template<typename, typename...> typename Share>
-void updateAccuracy(NeuralNetwork<T, Share> *net, std::vector<double> &labels, int &correct) {
+void updateAccuracy(NeuralNetwork<T, Share> *net, std::vector<double> &labels, int &correct, bool log_loss = false) {
 
     Share<T> *activations = net->layers[net->layers.size() - 1]->getActivation();
     //printShareFinite(*activations, "last layer activations", 10);
@@ -212,6 +238,12 @@ void updateAccuracy(NeuralNetwork<T, Share> *net, std::vector<double> &labels, i
     copyToHost(reconstructedOutput, hostOutput, true);
 
     int nClasses = hostOutput.size() / MINI_BATCH_SIZE;
+
+    // 新增：训练阶段可选记录 avg loss
+    if (log_loss && avg_loss_enabled) {
+        double batch_ce = compute_ce_loss_from_logits(hostOutput, labels, MINI_BATCH_SIZE, nClasses);
+        avg_loss_log_batch(batch_ce);
+    }
 
     for(int i = 0; i < MINI_BATCH_SIZE; i++) {
         auto result = std::max_element(hostOutput.begin() + (i * nClasses), hostOutput.begin() + ((i+1) * nClasses));
@@ -315,7 +347,7 @@ void train(NeuralNetwork<T, Share> *net, NeuralNetConfig *config, std::string ru
             net->forward(batch_data);
             toplevel_profiler.accumulate("fw-pass");
 
-            updateAccuracy(net, batch_labels, correct);
+            updateAccuracy(net, batch_labels, correct, true);
 
             if (piranha_config["eval_inference_stats"]) {
                 double fw_ms = toplevel_profiler.get_elapsed("fw-pass");
@@ -396,6 +428,8 @@ void train(NeuralNetwork<T, Share> *net, NeuralNetConfig *config, std::string ru
             net->saveSnapshot("output/"+run_name+"-epoch-"+std::to_string(e));
         }
 
+        avg_loss_new_epoch();
+
         fflush(stdout);
     }
 }
@@ -415,6 +449,54 @@ void getBatch(std::ifstream &f, std::istream_iterator<double> &it, std::vector<d
     }
 }
 
+double compute_ce_loss_from_logits(const std::vector<double>& logits,
+                                   const std::vector<double>& labels,
+                                   int mini_batch, int num_classes) {
+    double total = 0.0;
+    for (int i = 0; i < mini_batch; ++i) {
+        int base = i * num_classes;
+        int y = -1;
+        for (int c = 0; c < num_classes; ++c) {
+            if (labels[base + c] == 1.0) { y = c; break; }
+        }
+        if (y < 0) {
+            // 不是严格 one-hot 时退化处理：取最大值作为标签索引
+            y = int(std::max_element(labels.begin() + base, labels.begin() + base + num_classes) - (labels.begin() + base));
+        }
+        // 稳定 log-softmax: logsumexp
+        double m = logits[base];
+        for (int c = 1; c < num_classes; ++c) m = std::max(m, logits[base + c]);
+        double sum_exp = 0.0;
+        for (int c = 0; c < num_classes; ++c) {
+            sum_exp += std::exp(logits[base + c] - m);
+        }
+        double logsumexp = m + std::log(sum_exp);
+        total += -(logits[base + y] - logsumexp);
+    }
+    return total / mini_batch;
+}
+
+void avg_loss_log_batch(double batch_loss) {
+    if (!avg_loss_enabled) return;
+    std::lock_guard<std::mutex> lk(avg_loss_mtx);
+    avg_loss_window.push_back(batch_loss);
+    avg_loss_sum += batch_loss;
+    if ((int)avg_loss_window.size() > AVG_LOSS_WINDOW) {
+        avg_loss_sum -= avg_loss_window.front();
+        avg_loss_window.pop_front();
+    }
+    double avg = avg_loss_sum / (double)avg_loss_window.size();
+    avg_loss_out << avg << " ";
+}
+
+void avg_loss_new_epoch() {
+    if (!avg_loss_enabled) return;
+    std::lock_guard<std::mutex> lk(avg_loss_mtx);
+    avg_loss_out << std::endl;
+    avg_loss_window.clear();
+    avg_loss_sum = 0.0;
+}
+
 void deleteObjects() {
 	//close connection
 	for (int i = 0; i < piranha_config["num_parties"]; i++) {
@@ -427,4 +509,3 @@ void deleteObjects() {
 	delete[] communicationSenders;
 	delete[] addrs;
 }
-

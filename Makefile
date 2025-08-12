@@ -3,7 +3,7 @@ DEBUG_BINARY=piranha-debug
 BUILD_DIR=build
 DEBUG_DIR=debug
 
-CUDA_VERSION=11.5
+CUDA_VERSION=11.1
 CUTLASS_PATH=ext/cutlass
 
 CXX=/usr/local/cuda-$(CUDA_VERSION)/bin/nvcc
