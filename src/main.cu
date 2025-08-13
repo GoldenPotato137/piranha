@@ -487,6 +487,7 @@ void avg_loss_log_batch(double batch_loss) {
     }
     double avg = avg_loss_sum / (double)avg_loss_window.size();
     avg_loss_out << avg << " ";
+    std::cout << avg << std::endl;
 }
 
 void avg_loss_new_epoch() {

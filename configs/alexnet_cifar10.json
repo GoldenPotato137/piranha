@@ -30,7 +30,7 @@
     "run_name": "hello_world_run",
 
     "_desc_network": "Path to NN architecture to use for the run",
-    "network": "files/models/alexnet-cifar10-norelu.json",
+    "network": "files/models/alexnet-cifar10-ours.json",
 
     "_desc_custom_epochs": "Enable custom number of epochs. Otherwise set by size of learning rate schedule",
     "custom_epochs": true,
