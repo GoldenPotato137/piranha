@@ -112,7 +112,18 @@ if __name__ == "__main__":
 
     assert len(train_dataset.classes) == NUM_CLASSES, "NUM_CLASSES mismatch with dataset folders"
 
-    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=False, drop_last=True, num_workers=2)
+    # 仅对训练集进行打乱；使用固定种子的 generator 确保可复现
+    gen = torch.Generator()
+    gen.manual_seed(0)
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=BATCH_SIZE,
+        shuffle=True,           # 改为打乱
+        drop_last=True,
+        num_workers=2,
+        generator=gen           # 固定随机种子
+    )
+    # 验证集保持不打乱
     val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, drop_last=True, num_workers=2)
 
     print(f"Classes: {len(train_dataset.classes)}")

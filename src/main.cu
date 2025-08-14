@@ -249,6 +249,17 @@ void updateAccuracy(NeuralNetwork<T, Share> *net, std::vector<double> &labels, i
         auto result = std::max_element(hostOutput.begin() + (i * nClasses), hostOutput.begin() + ((i+1) * nClasses));
         int max_index = std::distance(hostOutput.begin(), result);
 
+        // auto targetIndex = -1;
+        // for (auto j = i * nClasses; j < (i + 1) * nClasses; j++) 
+        // {
+        //     if (labels[j] > 0.99) 
+        //     {
+        //         targetIndex = j - i * nClasses;
+        //         break;
+        //     }
+        // }
+        // std::cerr << max_index - i * nClasses << " " << labels[max_index] << " " << targetIndex << std::endl;
+
         if (labels[max_index] == 1.0) {
             correct++;
         }
@@ -318,6 +329,10 @@ void train(NeuralNetwork<T, Share> *net, NeuralNetConfig *config, std::string ru
     double total_comm_tx_mb = 0.0;
     double total_comm_rx_mb = 0.0;
     double total_time_s = 0.0;
+
+    std::cout << "batch size:" << MINI_BATCH_SIZE << std::endl;
+    std::cout << "input size: " << INPUT_SIZE << std::endl;
+    std::cout << "number of classes: " << NUM_CLASSES << std::endl;
 
     for (int e = 0; e < numEpochs; e++) {
 

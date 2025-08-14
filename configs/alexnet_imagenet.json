@@ -39,10 +39,10 @@
     "custom_epoch_count": 3,
 
     "_desc_custom_iterations": "Enable custom number of iterations. Otherwise set by training dataset size.",
-    "custom_iterations": false,
+    "custom_iterations": true,
 
     "_desc_custom_iteration_count": "Number of iterators to train per epoch, if custom_iterations is set",
-    "custom_iteration_count": 0,
+    "custom_iteration_count": 781,
 
     "_desc_custom_batch_size": "Enable custom batch size. Otherwise set by architecture configuration.",
     "custom_batch_size": false,
