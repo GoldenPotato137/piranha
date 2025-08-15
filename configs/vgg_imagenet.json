@@ -30,7 +30,7 @@
     "run_name": "hello_world_run",
 
     "_desc_network": "Path to NN architecture to use for the run",
-    "network": "files/models/alexnet-imagenet-ours.json",
+    "network": "files/models/vgg16-imagenet.json",
 
     "_desc_custom_epochs": "Enable custom number of epochs. Otherwise set by size of learning rate schedule",
     "custom_epochs": true,
