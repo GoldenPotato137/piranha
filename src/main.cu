@@ -51,6 +51,23 @@ std::deque<double> avg_loss_window;
 double avg_loss_sum = 0.0;
 const int AVG_LOSS_WINDOW = 20; // 滑动窗口大小=20
 
+// 梯度统计日志状态
+bool grad_stats_enabled = false;         // 是否启用
+bool grad_stats_reveal = true;           // 是否重构(明文统计，调试用途)
+bool grad_stats_per_layer = true;        // 是否逐层输出
+int  grad_stats_every = 1;               // 每多少个 iteration 记一次
+std::fstream grad_stats_out;             // 可选输出到CSV文件
+std::string grad_stats_path = "grad_stats.csv";
+struct GradStats {
+    size_t n = 0;
+    double mean = 0.0;
+    double std = 0.0;
+    double minv = 0.0;
+    double maxv = 0.0;
+    double l1 = 0.0;
+    double l2 = 0.0;
+};
+
 size_t db_bytes = 0;
 size_t db_layer_max_bytes = 0;
 size_t db_max_bytes = 0;
@@ -98,11 +115,24 @@ int main(int argc, char** argv) {
     std::ifstream input_config(parsed_options["config"].as<std::string>());
     input_config >> piranha_config;
 
-    // 读取 JSON 之后
     avg_loss_enabled = piranha_config.value("avg_loss_log", false);
     if (avg_loss_enabled) {
         std::string avg_path = piranha_config.value("avg_loss_output", std::string("avg_loss.txt"));
         avg_loss_out.open(avg_path, std::ios::out | std::ios::app);
+    }
+
+    // 读取梯度统计相关配置
+    grad_stats_enabled    = piranha_config.value("grad_stats_log", false);
+    grad_stats_reveal     = piranha_config.value("grad_stats_reveal", true);
+    grad_stats_per_layer  = piranha_config.value("grad_stats_per_layer", true);
+    grad_stats_every      = piranha_config.value("grad_stats_every", 1);
+    grad_stats_path       = piranha_config.value("grad_stats_output", std::string("grad_stats.csv"));
+    if (grad_stats_enabled && partyNum == 0) {
+        grad_stats_out.open(grad_stats_path, std::ios::out | std::ios::app);
+        if (grad_stats_out.tellp() == 0) {
+            // 写 CSV 头
+            grad_stats_out << "scope,epoch,iter,layer,name,n,mean,std,min,max,l2,l1\n";
+        }
     }
 
     // Start memory profiler and initialize communication between parties
@@ -217,6 +247,7 @@ int main(int argc, char** argv) {
     deleteObjects();
 
     if (avg_loss_out.is_open()) avg_loss_out.close();
+    if (grad_stats_out.is_open()) grad_stats_out.close();
 
     // wait a bit for the prints to flush
     std::cout << std::flush;
@@ -387,6 +418,11 @@ void train(NeuralNetwork<T, Share> *net, NeuralNetConfig *config, std::string ru
             net->backward(batch_labels);
             toplevel_profiler.accumulate("bw-pass");
 
+            // 记录梯度统计（每 grad_stats_every 次 iteration 记录一次）
+            if (grad_stats_enabled && (i % grad_stats_every == 0)) {
+                log_gradient_stats(net, e, i);
+            }
+
             if (piranha_config["eval_train_stats"]) {
                 double fw_bw_ms = toplevel_profiler.get_elapsed_all();
                 printf("training iteration (ms),%f\n", fw_bw_ms);
@@ -489,6 +525,66 @@ double compute_ce_loss_from_logits(const std::vector<double>& logits,
         total += -(logits[base + y] - logsumexp);
     }
     return total / mini_batch;
+}
+
+template<typename T, template<typename, typename...> typename Share>
+static GradStats calc_stats_from_share(Share<T>& s) {
+    GradStats gs;
+    gs.n = s.size();
+    if (gs.n == 0) return gs;
+    DeviceData<T> revealed(s.size());
+    reconstruct(s, revealed); // 明文重构（调试）
+    std::vector<double> host(revealed.size());
+    copyToHost(revealed, host, true);
+    double sum = 0.0, sumsq = 0.0, l1 = 0.0;
+    double mn = host[0], mx = host[0];
+    for (size_t i = 0; i < host.size(); ++i) {
+        const double v = host[i];
+        sum   += v;
+        sumsq += v * v;
+        l1    += std::abs(v);
+        if (v < mn) mn = v;
+        if (v > mx) mx = v;
+    }
+    double mean = sum / (double)gs.n;
+    double var  = std::max(0.0, sumsq / (double)gs.n - mean * mean);
+    gs.mean = mean;
+    gs.std  = std::sqrt(var);
+    gs.minv = mn;
+    gs.maxv = mx;
+    gs.l1   = l1;
+    gs.l2   = std::sqrt(sumsq);
+    return gs;
+}
+
+template<typename T, template<typename, typename...> typename Share>
+void log_gradient_stats(NeuralNetwork<T, Share>* net, int epoch, int iter) {
+    if (!grad_stats_enabled || !grad_stats_reveal) return;
+    // if (partyNum != 0) return; // 避免多方同时输出
+    // 逐层 delta 统计
+    if (grad_stats_per_layer) {
+        for (size_t li = 0; li < net->layers.size(); ++li) {
+            auto* delta = net->layers[li]->getDelta();
+            if (delta == nullptr || delta->size() == 0) continue;
+            GradStats gs = calc_stats_from_share(*delta);
+            // 控制台打印
+            printf("grad-delta,epoch,%d,iter,%d,layer,%zu,name,delta,n,%zu,mean,%g,std,%g,min,%g,max,%g,l2,%g,l1,%g\n",
+                   epoch, iter, li, gs.n, gs.mean, gs.std, gs.minv, gs.maxv, gs.l2, gs.l1);
+            // CSV 落盘
+            if (grad_stats_out.is_open()) {
+                grad_stats_out << "delta" << ","
+                               << epoch << "," << iter << "," << li << ","
+                               << "delta" << ","
+                               << gs.n << ","
+                               << gs.mean << "," << gs.std << ","
+                               << gs.minv << "," << gs.maxv << ","
+                               << gs.l2 << "," << gs.l1 << "\n";
+            }
+        }
+    } else {
+        // 合并统计（把所有层 delta 串起来再统计）——内存/时间略大，按需使用
+        // 如需实现，可把每层的 host 数据汇总后再计算一次统计
+    }
 }
 
 void avg_loss_log_batch(double batch_loss) {
