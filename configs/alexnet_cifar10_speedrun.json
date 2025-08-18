@@ -15,7 +15,7 @@
     "unit_test_only": false,
 
     "_desc_debug_print": "Show debug output",
-    "debug_print": true,
+    "debug_print": false,
 
     "_desc_debug_overflow": "Test for overflow and print related debug output. Breaks security by revealing intermediary values.",
     "debug_overflow": false,
@@ -30,7 +30,7 @@
     "run_name": "hello_world_run",
 
     "_desc_network": "Path to NN architecture to use for the run",
-    "network": "files/models/vgg16-cifar10-norelu.json",
+    "network": "files/models/alexnet-cifar10-ours.json",
 
     "_desc_custom_epochs": "Enable custom number of epochs. Otherwise set by size of learning rate schedule",
     "custom_epochs": true,
@@ -42,16 +42,16 @@
     "custom_iterations": true,
 
     "_desc_custom_iteration_count": "Number of iterators to train per epoch, if custom_iterations is set",
-    "custom_iteration_count": 20,
+    "custom_iteration_count": 30,
 
     "_desc_custom_batch_size": "Enable custom batch size. Otherwise set by architecture configuration.",
-    "custom_batch_size": true,
+    "custom_batch_size": false,
 
     "_desc_custom_batch_size_count": "Desired custom batch size",
-    "custom_batch_size_count": 32,
+    "custom_batch_size_count": 128,
 
     "_desc_nn_seed": "Seed for NN initialization",
-    "nn_seed": 114514,
+    "nn_seed": 343934585,
 
     "_desc_preload": "Preload weights from a snapshot directory instead of training from scratch",
     "preload": false,
@@ -60,7 +60,7 @@
     "preload_path": "",
 
     "_desc_lr_schedule": "Learning rate schedule, in negative powers of 2 (e.g. 3 -> learning rate of 2^-3). Assumes that the number of LR exponents matches the desired number of training epochs",
-    "lr_schedule": [3, 3, 3, 4, 5, 5, 6, 7, 8, 9],
+    "lr_schedule": [3, 3, 3, 4, 4, 5, 6, 7, 8, 9],
 
     "_desc_test_only": "Only run NN test, skip training (useful if weights have been preloaded)",
     "test_only": false,
@@ -117,17 +117,11 @@
     "pipeline": 1,
 
     "_desc_split": "Position of split",
-    "split": [0, 12],
+    "split": [0, 3],
 
     "_desc_proc_num": "Number of paralleled models",
     "proc_num": 2,
 
     "avg_loss_log": true,
-    "avg_loss_output": "output/avg_loss_vgg_cifar10.log",
-
-    "grad_stats_log": false,
-    "grad_stats_reveal": true,
-    "grad_stats_per_layer": true,
-    "grad_stats_every": 1,
-    "grad_stats_output": "output/grad_stats.csv"
+    "avg_loss_output": "output/avg_loss_alexnet_cifar10.log"
 }

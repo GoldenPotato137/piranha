@@ -15,7 +15,7 @@
     "unit_test_only": false,
 
     "_desc_debug_print": "Show debug output",
-    "debug_print": false,
+    "debug_print": true,
 
     "_desc_debug_overflow": "Test for overflow and print related debug output. Breaks security by revealing intermediary values.",
     "debug_overflow": false,
@@ -30,7 +30,7 @@
     "run_name": "hello_world_run",
 
     "_desc_network": "Path to NN architecture to use for the run",
-    "network": "files/models/lenet-ln-norelu.json",
+    "network": "files/models/sarda.json",
 
     "_desc_custom_epochs": "Enable custom number of epochs. Otherwise set by size of learning rate schedule",
     "custom_epochs": true,
@@ -117,11 +117,11 @@
     "pipeline": 1,
 
     "_desc_split": "Position of split",
-    "split": [0, 3, 6],
+    "split": [0, 2],
 
     "_desc_proc_num": "Number of paralleled models",
     "proc_num": 2,
 
     "avg_loss_log": true,
-    "avg_loss_output": "output/avg_loss.log"
+    "avg_loss_output": "output/avg_sarda_loss.log"
 }

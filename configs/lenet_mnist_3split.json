@@ -33,7 +33,7 @@
     "network": "files/models/lenet-norelu.json",
 
     "_desc_custom_epochs": "Enable custom number of epochs. Otherwise set by size of learning rate schedule",
-    "custom_epochs": true,
+    "custom_epochs": false,
 
     "_desc_custom_epoch_count": "Number of epochs to train for, if custom_epochs is set",
     "custom_epoch_count": 5,
@@ -60,7 +60,7 @@
     "preload_path": "",
 
     "_desc_lr_schedule": "Learning rate schedule, in negative powers of 2 (e.g. 3 -> learning rate of 2^-3). Assumes that the number of LR exponents matches the desired number of training epochs",
-    "lr_schedule": [3, 3, 3, 4, 4, 5, 6, 7, 8, 9],
+    "lr_schedule": [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3],
 
     "_desc_test_only": "Only run NN test, skip training (useful if weights have been preloaded)",
     "test_only": false,
@@ -69,7 +69,7 @@
     "inference_only": false,
 
     "_desc_no_test": "Do not run testing after training epochs",
-    "no_test": true,
+    "no_test": false,
 
     "_desc_last_test": "Only run a test pass after the last training epoch",
     "last_test": false,
@@ -123,5 +123,5 @@
     "proc_num": 2,
 
     "avg_loss_log": true,
-    "avg_loss_output": "output/avg_loss.log"
+    "avg_loss_output": "output/avg_loss_lenet.log"
 }
