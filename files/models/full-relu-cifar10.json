@@ -1,0 +1,30 @@
+{
+    "name": "AllConvNet",
+    "dataset": "CIFAR10",
+    "batch_size": 128,
+    "input_size": 3072,
+    "num_classes": 10,
+    "model": [
+        {
+            "layer": "relu",
+            "input_dim": 3072
+        },
+        {
+            "layer": "relu",
+            "input_dim": 3072
+        },
+        {
+            "layer": "relu",
+            "input_dim": 3072
+        },
+        {
+            "layer": "relu",
+            "input_dim": 3072
+        },
+        {
+            "layer": "fc",
+            "input_dim": 3072,
+            "output_dim": 10
+        }
+    ]
+}
